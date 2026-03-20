@@ -874,14 +874,12 @@ function sendMail(e) {
 function scaleToFit() {
   const scaler = document.getElementById('scaler');
   const availW = window.innerWidth;
-  const naturalW = 660; // 640 canvas + borders/padding
+  const naturalW = 660;
   if (availW < naturalW) {
     const s = availW / naturalW;
-    scaler.style.transform = `scale(${s})`;
-    scaler.style.transformOrigin = 'top center';
-    document.body.style.height = Math.round(window.innerHeight) + 'px';
+    scaler.style.zoom = s;
   } else {
-    scaler.style.transform = '';
+    scaler.style.zoom = '';
   }
 }
 window.addEventListener('resize', scaleToFit);
