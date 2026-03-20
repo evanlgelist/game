@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Martin's Job Quest — Hire Me!</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d0d1a;
+  color: #eee;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  touch-action: none;
+  overflow: hidden;
+}
+#title {
+  font-size: 1.6em;
+  color: #ffaa00;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px #ffaa00;
+  margin-bottom: 8px;
+}
+#subtitle {
+  font-size: 0.75em;
+  color: #888;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+#scaler {
+  transform-origin: top center;
+}
+#gameWrap {
+  position: relative;
+  width: 640px;
+  height: 480px;
+  border: 2px solid #333;
+  overflow: hidden;
+}
+
+/* ── Touch controls (shown only on touch devices) ── */
+#touchControls {
+  display: none;
+  position: relative;
+  width: 640px;
+  height: 120px;
+  margin-top: 6px;
+}
+@media (pointer: coarse) {
+  #touchControls { display: flex; justify-content: space-between; align-items: center; padding: 0 10px; }
+  #title { font-size: 1.1em; margin-bottom: 4px; }
+  #subtitle { display: none; }
+}
+.tpad { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px; gap: 6px; }
+.tbtn {
+  background: rgba(255,170,0,0.2);
+  border: 2px solid rgba(255,170,0,0.5);
+  border-radius: 10px;
+  color: #ffaa00;
+  font-size: 1.4em;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.tbtn:active, .tbtn.pressed { background: rgba(255,170,0,0.5); }
+#btnShoot {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: rgba(255,50,50,0.25);
+  border: 3px solid rgba(255,80,80,0.7);
+  color: #ff6666;
+  font-size: 2em;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+#btnShoot:active { background: rgba(255,50,50,0.6); }
+canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+/* ── HUD ── */
+#hud {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 44px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 6px;
+  pointer-events: none;
+  font-size: 13px;
+}
+#hpWrap { display: flex; align-items: center; gap: 6px; }
+#hpBar {
+  width: 110px; height: 10px;
+  background: #222; border: 1px solid #555;
+}
+#hpFill { height: 100%; width: 100%; background: #22ee22; transition: width 0.1s, background 0.3s; }
+
+#crosshair {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px; height: 20px;
+  pointer-events: none;
+}
+#crosshair::before, #crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255,255,255,0.75);
+}
+#crosshair::before { width: 2px; height: 20px; top: 0; left: 9px; }
+#crosshair::after  { width: 20px; height: 2px; top: 9px; left: 0; }
+
+#killMsg {
+  position: absolute;
+  top: 70px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #ffdd00;
+  text-shadow: 0 0 8px #ff8800;
+  pointer-events: none;
+  display: none;
+  white-space: nowrap;
+}
+
+/* ── OVERLAYS ── */
+.overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px 28px 16px;
+  overflow-y: auto;
+}
+.overlay h2 {
+  font-size: 1.9em;
+  color: #ffaa00;
+  text-shadow: 0 0 14px #ffaa00;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.overlay p {
+  max-width: 500px;
+  line-height: 1.65;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+  text-align: center;
+}
+.enemy-label { font-weight: bold; font-size: 0.95em; margin: 4px 0; }
+.red  { color: #ff5555; }
+.blue { color: #6688ff; }
+.gold { color: #ffaa00; font-weight: bold; }
+
+.controls {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 3px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid #333;
+  padding: 10px 18px;
+  border-radius: 4px;
+  margin: 10px 0;
+  font-size: 0.88em;
+  width: 100%;
+  max-width: 340px;
+  text-align: left;
+}
+.k { color: #ffaa00; font-weight: bold; }
+
+.btn {
+  padding: 11px 30px;
+  background: #ffaa00;
+  color: #000;
+  border: none;
+  font-size: 1.05em;
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 14px;
+  letter-spacing: 1px;
+}
+.btn:hover { background: #ffcc44; }
+.btn-danger { background: #cc2222; color: #fff; }
+.btn-danger:hover { background: #ee3333; }
+
+/* ── WIN FORM ── */
+#winScreen form { width: 100%; max-width: 440px; }
+.form-label { display: block; font-size: 0.78em; color: #aaa; margin: 8px 0 2px; }
+#winScreen input, #winScreen textarea, #winScreen select {
+  width: 100%;
+  padding: 8px 10px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  color: #eee;
+  font-family: inherit;
+  font-size: 0.88em;
+  border-radius: 3px;
+}
+#winScreen input:focus, #winScreen textarea:focus {
+  outline: none; border-color: #ffaa00;
+}
+#winScreen textarea { height: 72px; resize: vertical; }
+.submit-btn {
+  width: 100%; margin-top: 12px;
+  padding: 11px;
+  background: #22aa44; color: #fff;
+  border: none; font-size: 1em; font-family: inherit; font-weight: bold;
+  cursor: pointer; border-radius: 4px;
+  letter-spacing: 1px;
+}
+.submit-btn:hover { background: #33bb55; }
+.thanks-note { font-size: 0.78em; color: #777; margin-top: 10px; }
+
+/* ── MINIMAP ── */
+#minimap {
+  position: absolute;
+  top: 8px; right: 8px;
+  opacity: 0.75;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div id="scaler">
+<div id="title">MARTIN'S JOB QUEST</div>
+<div id="subtitle">a first-person job-hunting adventure</div>
+
+<div id="gameWrap">
+  <canvas id="c" width="640" height="480"></canvas>
+  <canvas id="minimap" width="90" height="90"></canvas>
+  <div id="crosshair"></div>
+  <div id="killMsg"></div>
+
+  <div id="hud">
+    <span id="hpWrap">❤ <span id="hpBar"><span id="hpFill"></span></span></span>
+    <span id="ammoTxt">🔫 AMMO: 20</span>
+    <span id="enemyTxt">ENEMIES: 4</span>
+  </div>
+
+  <!-- INTRO -->
+  <div class="overlay" id="introScreen">
+    <h2>MARTIN'S JOB QUEST</h2>
+    <p>Martin is on a mission — he needs a job!<br>
+       But two monsters stand between him and employment…</p>
+    <p class="enemy-label red">🔴 SELF CONFIDENCE — the inner doubt that whispers "you're not good enough"</p>
+    <p class="enemy-label blue">🔵 CV MISMATCH — "sorry, your experience doesn't quite fit"</p>
+    <p>Defeat them all and claim your reward: <span class="gold">the chance to hire Martin!</span></p>
+    <div class="controls">
+      <span class="k">W / ↑</span><span>Move forward</span>
+      <span class="k">S / ↓</span><span>Move back</span>
+      <span class="k">A / ←</span><span>Turn left</span>
+      <span class="k">D / →</span><span>Turn right</span>
+      <span class="k">SPACE / Click</span><span>Shoot</span>
+    </div>
+    <p style="color:#999;font-size:0.82em">Each enemy takes <strong style="color:#fff">2 hits</strong>.
+       You have <strong style="color:#fff">20 bullets</strong>.
+       Enemies chase you — don't let them touch you!</p>
+    <button class="btn" onclick="startGame()">▶ START GAME</button>
+  </div>
+
+  <!-- WIN -->
+  <div class="overlay" id="winScreen" style="display:none">
+    <h2>🎉 YOU WIN!</h2>
+    <p>You smashed Self Confidence and CV Mismatch!<br>
+       Martin is ready for his next challenge — <span class="gold">working with you!</span></p>
+    <p>Ready to make your next hire? Connect with Martin on LinkedIn:</p>
+    <a href="https://www.linkedin.com/in/martinfairall/" target="_blank" class="btn" style="text-decoration:none;margin-top:8px">
+      🔗 Connect with Martin on LinkedIn
+    </a>
+    <p class="thanks-note" style="margin-top:16px">Thanks for playing — Martin appreciates it! 🙏</p>
+  </div>
+
+  <!-- DEAD -->
+  <div class="overlay" id="deadScreen" style="display:none">
+    <h2 style="color:#ff4444">GAME OVER</h2>
+    <p>The obstacles overwhelmed Martin this time…</p>
+    <p>But he never gives up! Neither should you.</p>
+    <button class="btn btn-danger" onclick="resetGame()">↺ TRY AGAIN</button>
+  </div>
+</div>
+
+<!-- Touch controls -->
+<div id="touchControls">
+  <div class="tpad">
+    <div></div>
+    <div class="tbtn" id="btnUp">▲</div>
+    <div></div>
+    <div class="tbtn" id="btnLeft">◀</div>
+    <div class="tbtn" id="btnDown">▼</div>
+    <div class="tbtn" id="btnRight">▶</div>
+  </div>
+  <div id="btnShoot">🔫</div>
+</div>
+</div><!-- /scaler -->
+
+<script>
+// ─────────────────────────────────────────────
+//  MAP  (9 × 9)
+//  # = wall,   (space) = floor
+// ─────────────────────────────────────────────
+const MAP = [
+  "#########",
+  "#       #",
+  "#  # #  #",
+  "#       #",
+  "# #   # #",
+  "#       #",
+  "#  # #  #",
+  "#       #",
+  "#########"
+];
+const MAP_W = MAP[0].length;
+const MAP_H = MAP.length;
+
+function isWall(x, y) {
+  const mx = Math.floor(x), my = Math.floor(y);
+  if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H) return true;
+  return MAP[my][mx] === '#';
+}
+
+// ─────────────────────────────────────────────
+//  CANVAS / CTX
+// ─────────────────────────────────────────────
+const canvas   = document.getElementById('c');
+const ctx      = canvas.getContext('2d');
+const mmCanvas = document.getElementById('minimap');
+const mctx     = mmCanvas.getContext('2d');
+const W = 640, H = 480;
+
+const FOV      = Math.PI / 3;   // 60°
+const HALF_FOV = FOV / 2;
+const PROJ     = W / (2 * Math.tan(HALF_FOV)); // = W/2 / tan(30°)
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let state;        // 'intro' | 'playing' | 'win' | 'dead'
+let player, enemies, zbuffer, keys, shootCooldown, flashTimer, lastTs;
+
+function initGame() {
+  player = {
+    x: 1.5, y: 1.5,
+    angle: 0.0,
+    health: 100,
+    ammo: 20,
+    hurtTimer: 0,
+    shakeTimer: 0
+  };
+
+  enemies = [
+    { x: 7.5, y: 1.5, type: 'confidence', health: 2, label: 'SELF CONFIDENCE', color: '#cc2222', bright: '#ff5555' },
+    { x: 1.5, y: 7.5, type: 'confidence', health: 2, label: 'SELF CONFIDENCE', color: '#cc2222', bright: '#ff5555' },
+    { x: 7.5, y: 7.5, type: 'cv',         health: 2, label: 'CV MISMATCH',     color: '#2244cc', bright: '#5577ff' },
+    { x: 4.5, y: 5.5, type: 'cv',         health: 2, label: 'CV MISMATCH',     color: '#2244cc', bright: '#5577ff' },
+  ];
+  enemies.forEach(e => e.alive = true);
+
+  zbuffer       = new Float32Array(W);
+  keys          = {};
+  shootCooldown = 0;
+  flashTimer    = 0;
+  state         = 'playing';
+
+  updateHUD();
+  lastTs = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  document.getElementById('introScreen').style.display = 'none';
+  initGame();
+}
+
+function resetGame() {
+  document.getElementById('deadScreen').style.display = 'none';
+  initGame();
+}
+
+// ─────────────────────────────────────────────
+//  INPUT
+// ─────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') { e.preventDefault(); tryShoot(); }
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+canvas.addEventListener('mousedown', () => { if (state === 'playing') tryShoot(); });
+
+// ─────────────────────────────────────────────
+//  SHOOT
+// ─────────────────────────────────────────────
+function tryShoot() {
+  if (state !== 'playing') return;
+  if (shootCooldown > 0)   return;
+  if (player.ammo <= 0)    { flash('OUT OF AMMO!', '#ff4444'); return; }
+
+  player.ammo--;
+  shootCooldown = 0.35;
+  flashTimer    = 0.12;
+
+  // Find the closest enemy roughly in the crosshair
+  let hit = null, bestDist = Infinity;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const dx = e.x - player.x, dy = e.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    let angle = Math.atan2(dy, dx) - player.angle;
+    // Normalise to [-π, π]
+    angle = ((angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+
+    // Tolerance: tighter at long range, forgiving up close
+    const tol = 0.35 + 0.4 / dist;
+    if (Math.abs(angle) < tol && dist < bestDist && los(player.x, player.y, e.x, e.y)) {
+      bestDist = dist; hit = e;
+    }
+  }
+
+  if (hit) {
+    hit.health--;
+    if (hit.health <= 0) {
+      hit.alive = false;
+      flash(`${hit.label} — DESTROYED! 💥`, '#ffdd00');
+      if (enemies.every(e => !e.alive)) { state = 'win'; setTimeout(showWin, 600); }
+    } else {
+      flash(`HIT! ${hit.health} HP left`, '#ffaa00');
+    }
+  } else {
+    flash('MISSED!', '#aaaaaa');
+  }
+  updateHUD();
+}
+
+function los(x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const steps = Math.ceil(Math.sqrt(dx * dx + dy * dy) * 12);
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    if (isWall(x1 + dx * t, y1 + dy * t)) return false;
+  }
+  return true;
+}
+
+let flashMsgTimer = 0, flashMsgText = '', flashMsgColor = '#fff';
+function flash(msg, color) {
+  flashMsgText  = msg;
+  flashMsgColor = color;
+  flashMsgTimer = 1.8;
+  const el = document.getElementById('killMsg');
+  el.textContent = msg;
+  el.style.color  = color;
+  el.style.textShadow = `0 0 10px ${color}`;
+  el.style.display = 'block';
+}
+
+function showWin() {
+  document.getElementById('winScreen').style.display = 'flex';
+}
+
+// ─────────────────────────────────────────────
+//  UPDATE
+// ─────────────────────────────────────────────
+function update(dt) {
+  if (state !== 'playing') return;
+
+  const TURN  = 2.2 * dt;
+  const SPEED = 3.0 * dt;
+  const MARGIN = 0.28;
+
+  // Turn
+  if (keys['ArrowLeft']  || keys['KeyA']) player.angle -= TURN;
+  if (keys['ArrowRight'] || keys['KeyD']) player.angle += TURN;
+
+  // Move
+  let nx = player.x, ny = player.y;
+  if (keys['ArrowUp']   || keys['KeyW']) { nx += Math.cos(player.angle) * SPEED; ny += Math.sin(player.angle) * SPEED; }
+  if (keys['ArrowDown'] || keys['KeyS']) { nx -= Math.cos(player.angle) * SPEED; ny -= Math.sin(player.angle) * SPEED; }
+
+  if (!isWall(nx, player.y + MARGIN) && !isWall(nx, player.y - MARGIN)) player.x = nx;
+  if (!isWall(player.x + MARGIN, ny) && !isWall(player.x - MARGIN, ny)) player.y = ny;
+
+  // Timers
+  if (shootCooldown > 0)   shootCooldown   -= dt;
+  if (flashTimer    > 0)   flashTimer      -= dt;
+  if (player.hurtTimer > 0) player.hurtTimer -= dt;
+  if (player.shakeTimer > 0) player.shakeTimer -= dt;
+  if (flashMsgTimer > 0) {
+    flashMsgTimer -= dt;
+    if (flashMsgTimer <= 0) document.getElementById('killMsg').style.display = 'none';
+  }
+
+  // Enemy AI
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const dx = player.x - e.x, dy = player.y - e.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Move toward player
+    if (dist > 0.55) {
+      const spd = 0.55 * dt;
+      const enx = e.x + (dx / dist) * spd;
+      const eny = e.y + (dy / dist) * spd;
+      if (!isWall(enx, e.y)) e.x = enx;
+      if (!isWall(e.x, eny)) e.y = eny;
+    }
+
+    // Hurt player on contact
+    if (dist < 0.65 && player.hurtTimer <= 0) {
+      player.health -= 8;
+      player.hurtTimer  = 1.2;
+      player.shakeTimer = 0.25;
+      updateHUD();
+      if (player.health <= 0) {
+        state = 'dead';
+        document.getElementById('deadScreen').style.display = 'flex';
+        return;
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  RENDER — raycaster (DDA)
+// ─────────────────────────────────────────────
+function render() {
+  // Screen shake
+  const shk = player.shakeTimer > 0 ? (Math.random() - 0.5) * 6 * player.shakeTimer : 0;
+  ctx.save();
+  if (shk) ctx.translate(shk, shk * 0.5);
+
+  // Ceiling gradient
+  const cg = ctx.createLinearGradient(0, 0, 0, H / 2);
+  cg.addColorStop(0, '#0a0418');
+  cg.addColorStop(1, '#1e0f3a');
+  ctx.fillStyle = cg;
+  ctx.fillRect(0, 0, W, H / 2);
+
+  // Floor gradient
+  const fg = ctx.createLinearGradient(0, H / 2, 0, H);
+  fg.addColorStop(0, '#1e1e1e');
+  fg.addColorStop(1, '#111');
+  ctx.fillStyle = fg;
+  ctx.fillRect(0, H / 2, W, H / 2);
+
+  // ── Wall raycasting (DDA) ──
+  for (let col = 0; col < W; col++) {
+    const rayAngle = player.angle - HALF_FOV + (col / W) * FOV;
+    const rdx = Math.cos(rayAngle);
+    const rdy = Math.sin(rayAngle);
+
+    let mx = Math.floor(player.x);
+    let my = Math.floor(player.y);
+
+    const ddx = Math.abs(rdx) < 1e-10 ? 1e10 : Math.abs(1 / rdx);
+    const ddy = Math.abs(rdy) < 1e-10 ? 1e10 : Math.abs(1 / rdy);
+
+    let sdx = rdx < 0 ? (player.x - mx) * ddx : (mx + 1 - player.x) * ddx;
+    let sdy = rdy < 0 ? (player.y - my) * ddy : (my + 1 - player.y) * ddy;
+    const sx = rdx < 0 ? -1 : 1;
+    const sy = rdy < 0 ? -1 : 1;
+
+    let side = 0;
+    for (let safe = 0; safe < 32; safe++) {
+      if (sdx < sdy) { sdx += ddx; mx += sx; side = 0; }
+      else           { sdy += ddy; my += sy; side = 1; }
+      if (MAP[my] && MAP[my][mx] === '#') break;
+    }
+
+    // Perpendicular distance (fixes fisheye)
+    let perpDist = side === 0 ? (sdx - ddx) : (sdy - ddy);
+    if (perpDist < 0.001) perpDist = 0.001;
+    zbuffer[col] = perpDist;
+
+    const wallH = Math.min(H * 2, Math.floor(PROJ / perpDist));
+    const wallTop = Math.floor((H - wallH) / 2);
+
+    // Brick-ish colour — EW faces slightly darker
+    const bright = Math.min(1.0, 1.8 / perpDist) * (side === 0 ? 1.0 : 0.65);
+    const r = Math.floor(bright * 160 + (side === 0 ? 10 : 0));
+    const g = Math.floor(bright * 80);
+    const b = Math.floor(bright * 60);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(col, wallTop, 1, wallH);
+  }
+
+  // ── Enemy sprites ──
+  renderSprites();
+
+  // ── Gun ──
+  drawGun();
+
+  // ── Muzzle flash ──
+  if (flashTimer > 0) {
+    const alpha = (flashTimer / 0.12) * 0.55;
+    const grad = ctx.createRadialGradient(W / 2, H / 2 + 40, 0, W / 2, H / 2 + 40, 90);
+    grad.addColorStop(0, `rgba(255,220,80,${alpha})`);
+    grad.addColorStop(1, 'rgba(255,100,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // ── Hurt vignette ──
+  if (player.hurtTimer > 0.4) {
+    const a = (player.hurtTimer - 0.4) * 0.7;
+    const vg = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.8);
+    vg.addColorStop(0, `rgba(200,0,0,0)`);
+    vg.addColorStop(1, `rgba(200,0,0,${a})`);
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.restore();
+
+  // ── Minimap ──
+  drawMinimap();
+}
+
+// ─────────────────────────────────────────────
+//  SPRITE RENDERER
+// ─────────────────────────────────────────────
+function renderSprites() {
+  const alive = enemies.filter(e => e.alive);
+  // Sort farthest → nearest (painter's order)
+  alive.sort((a, b) => {
+    const da = (a.x-player.x)**2 + (a.y-player.y)**2;
+    const db = (b.x-player.x)**2 + (b.y-player.y)**2;
+    return db - da;
+  });
+
+  for (const sp of alive) {
+    const dx = sp.x - player.x;
+    const dy = sp.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 0.3) continue;
+
+    let angle = Math.atan2(dy, dx) - player.angle;
+    angle = ((angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    if (Math.abs(angle) > HALF_FOV + 0.15) continue;
+
+    const screenX = Math.floor(W * (0.5 + angle / FOV));
+    const sprH    = Math.min(H * 2, Math.floor(PROJ / dist));
+    const sprW    = Math.floor(sprH * 0.65);
+
+    const x0 = screenX - Math.floor(sprW / 2);
+    const y0 = Math.floor(H / 2 - sprH / 2);
+
+    const colStart = Math.max(0, x0);
+    const colEnd   = Math.min(W, x0 + sprW);
+
+    // Draw column-by-column (z-checked)
+    for (let col = colStart; col < colEnd; col++) {
+      if (dist >= zbuffer[col]) continue;    // occluded by wall
+
+      const tx = (col - x0) / sprW;          // 0..1 across sprite
+
+      // --- Head (top 30%) ---
+      const headTop  = Math.max(0, y0);
+      const headBot  = Math.min(H, y0 + Math.floor(sprH * 0.30));
+      if (headBot > headTop) {
+        // Skin
+        ctx.fillStyle = '#e8b98a';
+        ctx.fillRect(col, headTop, 1, headBot - headTop);
+        // Simple eyes
+        const eyeRow = headTop + Math.floor((headBot - headTop) * 0.45);
+        if (eyeRow >= 0 && eyeRow < H) {
+          if ((tx > 0.22 && tx < 0.40) || (tx > 0.60 && tx < 0.78)) {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(col, eyeRow, 1, Math.max(1, Math.floor(sprH * 0.04)));
+          }
+        }
+        // Angry brow
+        const browRow = headTop + Math.floor((headBot - headTop) * 0.25);
+        if (browRow >= 0 && browRow < H && (tx > 0.18 && tx < 0.82)) {
+          ctx.fillStyle = '#222';
+          ctx.fillRect(col, browRow, 1, 1);
+        }
+      }
+
+      // --- Body (next 50%) ---
+      const bodyTop = Math.min(H, y0 + Math.floor(sprH * 0.30));
+      const bodyBot = Math.min(H, y0 + Math.floor(sprH * 0.80));
+      if (bodyBot > bodyTop && bodyTop >= 0) {
+        ctx.fillStyle = sp.color;
+        ctx.fillRect(col, bodyTop, 1, bodyBot - bodyTop);
+        // Highlight stripe
+        if (tx > 0.40 && tx < 0.60) {
+          ctx.fillStyle = sp.bright;
+          ctx.fillRect(col, bodyTop, 1, bodyBot - bodyTop);
+        }
+      }
+
+      // --- Legs (bottom 20%) ---
+      const legTop = Math.min(H, y0 + Math.floor(sprH * 0.80));
+      const legBot = Math.min(H, y0 + sprH);
+      if (legBot > legTop && legTop >= 0) {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(col, legTop, 1, legBot - legTop);
+      }
+    }
+
+    // --- Name label + health bar (visible up to dist 7) ---
+    if (dist < 7 && screenX > 20 && screenX < W - 20) {
+      const fade = Math.min(1, (7 - dist) / 5);
+      ctx.globalAlpha = fade;
+
+      const labelY = Math.max(14, y0 - 6);
+      const fs     = Math.max(9, Math.min(14, Math.floor(14 / dist)));
+      ctx.font      = `bold ${fs}px Courier New`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = sp.type === 'confidence' ? '#ff6666' : '#7799ff';
+      ctx.fillText(sp.label, screenX, labelY);
+
+      // HP bar
+      const bw = Math.max(30, Math.floor(sprW * 0.85));
+      const bx = screenX - bw / 2;
+      const by = labelY + 3;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(bx, by, bw, 4);
+      const hpColor = sp.health === 3 ? '#22ee22' : sp.health === 2 ? '#ffee00' : '#ff3333';
+      ctx.fillStyle = hpColor;
+      ctx.fillRect(bx, by, Math.floor(bw * sp.health / 3), 4);
+
+      ctx.globalAlpha = 1;
+      ctx.textAlign   = 'left';
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  GUN GRAPHIC
+// ─────────────────────────────────────────────
+function drawGun() {
+  const bob = Math.sin(Date.now() / 300) * 3;
+  const gx  = W / 2 + 30;
+  const gy  = H - 80 + bob + (flashTimer > 0 ? -12 * (flashTimer / 0.12) : 0);
+
+  ctx.save();
+  // Barrel
+  ctx.fillStyle = '#888';
+  ctx.fillRect(gx - 4, gy - 50, 8, 50);
+  // Body
+  ctx.fillStyle = '#666';
+  ctx.fillRect(gx - 14, gy - 25, 30, 30);
+  // Grip
+  ctx.fillStyle = '#444';
+  ctx.fillRect(gx - 4, gy + 4, 14, 20);
+  // Highlight
+  ctx.fillStyle = '#999';
+  ctx.fillRect(gx - 2, gy - 48, 3, 42);
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+//  MINIMAP
+// ─────────────────────────────────────────────
+function drawMinimap() {
+  const S  = 90;
+  const cs = S / MAP_W; // cell size
+
+  mctx.clearRect(0, 0, S, S);
+  mctx.fillStyle = 'rgba(0,0,0,0.6)';
+  mctx.fillRect(0, 0, S, S);
+
+  for (let my = 0; my < MAP_H; my++) {
+    for (let mx2 = 0; mx2 < MAP_W; mx2++) {
+      if (MAP[my][mx2] === '#') {
+        mctx.fillStyle = '#554433';
+        mctx.fillRect(mx2 * cs, my * cs, cs - 1, cs - 1);
+      }
+    }
+  }
+
+  // Enemies
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    mctx.fillStyle = e.type === 'confidence' ? '#ff4444' : '#4466ff';
+    mctx.beginPath();
+    mctx.arc(e.x * cs, e.y * cs, 2.5, 0, Math.PI * 2);
+    mctx.fill();
+  }
+
+  // Player
+  mctx.fillStyle = '#ffaa00';
+  mctx.beginPath();
+  mctx.arc(player.x * cs, player.y * cs, 3, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Direction arrow
+  mctx.strokeStyle = '#ffaa00';
+  mctx.lineWidth = 1.5;
+  mctx.beginPath();
+  mctx.moveTo(player.x * cs, player.y * cs);
+  mctx.lineTo(player.x * cs + Math.cos(player.angle) * 7, player.y * cs + Math.sin(player.angle) * 7);
+  mctx.stroke();
+}
+
+// ─────────────────────────────────────────────
+//  HUD
+// ─────────────────────────────────────────────
+function updateHUD() {
+  const hp = Math.max(0, player.health);
+  document.getElementById('hpFill').style.width    = hp + '%';
+  document.getElementById('hpFill').style.background =
+    hp > 60 ? '#22ee22' : hp > 30 ? '#ffee00' : '#ff3333';
+  document.getElementById('ammoTxt').textContent =
+    '🔫 AMMO: ' + player.ammo;
+  document.getElementById('enemyTxt').textContent =
+    'ENEMIES: ' + enemies.filter(e => e.alive).length;
+}
+
+// ─────────────────────────────────────────────
+//  GAME LOOP
+// ─────────────────────────────────────────────
+function loop(ts) {
+  if (state !== 'playing') return;
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ─────────────────────────────────────────────
+//  CONTACT FORM — mailto (works locally + GitHub Pages)
+// ─────────────────────────────────────────────
+function sendMail(e) {
+  e.preventDefault();
+  const name    = document.getElementById('f-name').value.trim();
+  const email   = document.getElementById('f-email').value.trim();
+  const company = document.getElementById('f-company').value.trim();
+  const role    = document.getElementById('f-role').value.trim();
+  const message = document.getElementById('f-message').value.trim();
+
+  const body = [
+    'Hi Martin,',
+    '',
+    'Name:    ' + name,
+    'Email:   ' + email,
+    company ? 'Company: ' + company : '',
+    role    ? 'Role:    ' + role    : '',
+    '',
+    message || '(No additional message)',
+    '',
+    '— Sent from Martin\'s Job Quest 🎮'
+  ].filter(l => l !== undefined).join('\n');
+
+  const mailto = 'mailto:martin.fairall@evangelisttech.com'
+    + '?subject=' + encodeURIComponent('Job Opportunity from Martin\'s Quest!')
+    + '&body='    + encodeURIComponent(body);
+
+  window.location.href = mailto;
+
+  document.getElementById('contactForm').style.display = 'none';
+  document.getElementById('thanksTxt').style.display   = 'block';
+}
+
+// ─────────────────────────────────────────────
+//  MOBILE SCALING
+// ─────────────────────────────────────────────
+function scaleToFit() {
+  const scaler = document.getElementById('scaler');
+  const availW = window.innerWidth;
+  const naturalW = 660; // 640 canvas + borders/padding
+  if (availW < naturalW) {
+    const s = availW / naturalW;
+    scaler.style.transform = `scale(${s})`;
+    scaler.style.transformOrigin = 'top center';
+    document.body.style.height = Math.round(window.innerHeight) + 'px';
+  } else {
+    scaler.style.transform = '';
+  }
+}
+window.addEventListener('resize', scaleToFit);
+scaleToFit();
+
+// ─────────────────────────────────────────────
+//  TOUCH CONTROLS
+// ─────────────────────────────────────────────
+function bindTouchBtn(id, keyCode) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('touchstart', e => { e.preventDefault(); keys[keyCode] = true;  el.classList.add('pressed'); },    { passive: false });
+  el.addEventListener('touchend',   e => { e.preventDefault(); keys[keyCode] = false; el.classList.remove('pressed'); }, { passive: false });
+  el.addEventListener('touchcancel',e => { keys[keyCode] = false; el.classList.remove('pressed'); });
+}
+bindTouchBtn('btnUp',    'ArrowUp');
+bindTouchBtn('btnDown',  'ArrowDown');
+bindTouchBtn('btnLeft',  'ArrowLeft');
+bindTouchBtn('btnRight', 'ArrowRight');
+
+document.getElementById('btnShoot').addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (state === 'playing') tryShoot();
+}, { passive: false });
+
+// Kick off showing intro frame
+(function drawStaticBg() {
+  // So the canvas isn't blank before game starts
+  const cg = ctx.createLinearGradient(0, 0, 0, H / 2);
+  cg.addColorStop(0, '#0a0418'); cg.addColorStop(1, '#1e0f3a');
+  ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H / 2);
+  ctx.fillStyle = '#111'; ctx.fillRect(0, H / 2, W, H / 2);
+})();
+</script>
+</body>
+</html>
